@@ -1,11 +1,10 @@
-from flask import Flask, render_template
+import streamlit as st
+from data_processor import DataProcessor
 
-app = Flask(__name__)
+# 你的 Streamlit 代码
+def main():
+    st.title("数据分析平台")
+    # ... 其他代码
 
-# 这里自动加载你的 HTML 前端页面
-@app.route('/')
-def index():
-    return render_template('csv_visualization_with_data.html')
-
-if __name__ == '__main__':
-    app.run(debug=True)
+if __name__ == "__main__":
+    main()
