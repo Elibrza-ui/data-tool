@@ -1,5 +1,4 @@
 import streamlit as st
-from data_processor import DataProcessor
 
 # 你的 Streamlit 代码
 def main():
