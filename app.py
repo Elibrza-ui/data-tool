@@ -86,7 +86,7 @@ def main():
 
         # 如果没有数据，显示提示
         if st.session_state.current_df is None:
-            st.info("👈 请在左侧配置数据路径并点击"加载数据"按钮")
+            st.info("👈 请在左侧配置数据路径并点击'加载数据'按钮")
             return
 
         processor = st.session_state.processor
@@ -222,8 +222,7 @@ def main():
 
         # 页脚
         st.markdown("---")
-        st.markdown("<center><small>💡 提示: 调整筛选条件后数据会自动更新</small></center>",
-                    unsafe_allow_html=True)
+        st.markdown("<center><small>💡 提示: 调整筛选条件后数据会自动更新</small></center>", unsafe_allow_html=True)
 
     # ========== 模式2: 自定义 HTML 页面 ==========
     else:
@@ -246,7 +245,7 @@ def main():
                 html_content = f.read()
 
             # 使用 Streamlit 的 html 组件显示
-            st.components.v1.html(html_content, height=800, scrolling=True)
+            components.html(html_content, height=800, scrolling=True)
 
             st.info("💡 这是你自定义的 HTML 页面,嵌入在 Streamlit 中显示")
         else:
@@ -347,7 +346,7 @@ def main():
 
         # 如果没有数据，显示提示
         if st.session_state.current_df is None:
-            st.info("👈 请在左侧配置数据路径并点击"加载数据"按钮")
+            st.info("👈 请在左侧配置数据路径并点击'加载数据'按钮")
             return
 
         processor = st.session_state.processor
@@ -483,8 +482,7 @@ def main():
 
         # 页脚
         st.markdown("---")
-        st.markdown("<center><small>💡 提示: 调整筛选条件后数据会自动更新</small></center>",
-                    unsafe_allow_html=True)
+        st.markdown("<center><small>💡 提示: 调整筛选条件后数据会自动更新</small></center>", unsafe_allow_html=True)
 
     # ========== 模式2: 自定义 HTML 页面 ==========
     else:
