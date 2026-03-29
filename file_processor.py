@@ -28,6 +28,7 @@ def render_file_processor_page():
             background-color: #f0f2f6 !important;
             max-height: none !important;
             height: auto !important;
+            padding-bottom: 100px !important;
         }
 
         /* 标题样式 */
