@@ -26,6 +26,8 @@ def render_file_processor_page():
         /* 主容器背景 */
         .block-container {
             background-color: #f0f2f6 !important;
+            max-height: none !important;
+            height: auto !important;
         }
 
         /* 标题样式 */
@@ -105,6 +107,10 @@ def render_file_processor_page():
         /* 滑块样式 */
         .stSlider > div > div > div {
             background-color: #3b82f6;
+        }
+        .block-container {
+        background-color: #f0f2f6 !important;
+        padding-bottom: 100px !important;  /* 底部留出100px空间 */
         }
     </style>
     """, unsafe_allow_html=True)
@@ -285,13 +291,10 @@ def merge_files_section():
                                 output_file = upload_dir / f"merged_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
                                 merged_df.to_csv(output_file, index=False)
                                 st.success(f"✅ 已保存到 {output_file.name}")
+                            else:
+                                st.error("❌ 合并失败")
                         else:
-                            st.error("❌ 合并失败")
-        else:
-            st.info("📁 上传目录中没有CSV文件，请先上传文件")
-    else:
-        st.info("📁 请先上传CSV文件")
-
+                            st.info("📁 上传目录中没有CSV文件，请先上传文件")
 
 def filter_data_section():
     """数据筛选区域"""
@@ -306,6 +309,13 @@ def filter_data_section():
         key="filter_upload"
     )
 
+    st.markdown("---")
+    st.subheader("🔍 数据筛选")
+
+    # 获取所有可用文件（包括上传的文件和本地文件）
+    all_available_files = []
+
+    # 添加刚刚上传的文件
     if uploaded_files:
         st.success(f"✅ 已上传 {len(uploaded_files)} 个文件")
 
@@ -315,6 +325,8 @@ def filter_data_section():
                 df = pd.read_csv(file)
                 st.write(f"**{file.name}** - {len(df)} 行, {len(df.columns)} 列")
                 st.dataframe(df.head(3))
+
+        all_available_files.extend(uploaded_files)
 
         # 保存文件到本地
         if st.button("💾 保存文件", key="save_filter"):
@@ -328,31 +340,36 @@ def filter_data_section():
 
             st.success(f"✅ 文件已保存到 {save_dir.absolute()}")
 
-    st.markdown("---")
-    st.subheader("🔍 数据筛选")
-    
-    # 加载合并后的文件
+    # 添加本地已保存的文件
     upload_dir = Path("uploaded_files")
-    merged_files = list(upload_dir.glob("merged_*.csv")) if upload_dir.exists() else []
-    
-    if merged_files:
+    if upload_dir.exists():
+        csv_files = list(upload_dir.glob("*.csv"))
+        all_available_files.extend(csv_files)
+
+    if all_available_files:
         selected_file = st.selectbox(
             "选择要筛选的文件",
-            options=[f.name for f in merged_files],
+            options=[f.name for f in all_available_files],
             index=0
         )
-        
+
         if selected_file:
-            df = pd.read_csv(upload_dir / selected_file)
+            # 根据文件类型选择加载方式
+            uploaded_file = next((f for f in (uploaded_files or []) if f.name == selected_file), None)
+            if uploaded_file:
+                df = pd.read_csv(uploaded_file)
+            else:
+                df = pd.read_csv(upload_dir / selected_file)
+
             st.info(f"📊 加载了 {len(df)} 行数据")
-            
+
             # 选择筛选列
             filter_column = st.selectbox(
                 "选择筛选列",
                 options=df.columns.tolist(),
                 key="filter_column_select"
             )
-            
+
             if filter_column:
                 # 显示该列的数据类型和统计信息
                 col1, col2 = st.columns(2)
@@ -362,7 +379,7 @@ def filter_data_section():
                     if df[filter_column].dtype in ['int64', 'float64']:
                         st.write(f"**最小值**: {df[filter_column].min()}")
                         st.write(f"**最大值**: {df[filter_column].max()}")
-                
+
                 # 根据数据类型显示不同的筛选选项
                 if df[filter_column].dtype in ['int64', 'float64']:
                     st.subheader("数值范围筛选")
@@ -380,18 +397,18 @@ def filter_data_section():
                         filtered_df = df[df[filter_column].astype(str).str.contains(search_value, case=False, na=False)]
                     else:
                         filtered_df = df.copy()
-                
+
                 # 显示筛选结果
                 st.write(f"筛选后: {len(filtered_df)} 行")
                 st.dataframe(filtered_df.head(20))
-                
+
                 # 导出筛选结果
                 if st.button("💾 导出筛选结果"):
                     output_file = upload_dir / f"filtered_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
                     filtered_df.to_csv(output_file, index=False)
                     st.success(f"✅ 已导出到 {output_file.name}")
     else:
-        st.info("📁 没有可筛选的文件，请先合并文件")
+        st.info("📁 请先上传CSV文件")
 
 
 def export_data_section():
