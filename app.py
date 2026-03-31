@@ -12,9 +12,31 @@ st.set_page_config(
 # ====================== 2. 唯一安全CSS：只隐藏Deploy，不动任何布局 ======================
 st.markdown("""
 <style>
-    /* 只隐藏Deploy按钮，绝对不会产生黑边！！ */
-    .stDeployButton {
-        display: none !important;
+    header[data-testid="stHeader"] {
+        background-color: #ffffff !important;
+    }
+    header[data-testid="stHeader"]::before {
+        content: "📊数据可视化分析";
+        color: #000000;
+        font-size: 40px;
+        font-weight: 600;
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 999;
+    }
+    .stAppViewContainer {
+        top: 0px !important;
+        background: #f0f2f6 !important;
+    }
+    .stAppViewContainer {
+    top: 0 !important;
+    background: #f0f2f6 !important;
+    }
+    div[data-testid="stSidebarCollapsedControl"] button {
+        color: black !important;
+        fill: black !important;
     }
 </style>
 """, unsafe_allow_html=True)
