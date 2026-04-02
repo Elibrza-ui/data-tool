@@ -6,10 +6,73 @@
 import pandas as pd
 import streamlit as st
 from pathlib import Path
-import os
-from typing import List, Optional
-import zipfile
+from typing import List
+
 from datetime import datetime
+
+
+def read_csv_with_auto_separator(file_path_or_uploaded):
+    """尝试自动检测分隔符并读取CSV文件"""
+    import io
+
+    # 如果是上传的文件对象，先读取内容
+    if hasattr(file_path_or_uploaded, 'read'):
+        content = file_path_or_uploaded.read()
+        # 如果是上传的文件，需要重置指针
+        if hasattr(file_path_or_uploaded, 'seek'):
+            file_path_or_uploaded.seek(0)
+        # 解码内容
+        try:
+            text = content.decode('utf-8')
+        except:
+            try:
+                text = content.decode('gbk')
+            except:
+                text = content.decode('latin-1')
+        file_obj = io.StringIO(text)
+    else:
+        # 本地文件路径
+        file_path_or_uploaded = Path(file_path_or_uploaded)
+        try:
+            text = file_path_or_uploaded.read_text(encoding='utf-8')
+        except:
+            try:
+                text = file_path_or_uploaded.read_text(encoding='gbk')
+            except:
+                text = file_path_or_uploaded.read_text(encoding='latin-1')
+        file_obj = io.StringIO(text)
+
+    # 检测分隔符
+    first_line = text.split('\n')[0] if text else ''
+    if '\t' in first_line:
+        sep = '\t'
+    elif ';' in first_line:
+        sep = ';'
+    else:
+        sep = ','
+
+    # 尝试读取文件
+    try:
+        if hasattr(file_path_or_uploaded, 'read'):
+            # 重置文件指针
+            if hasattr(file_path_or_uploaded, 'seek'):
+                file_path_or_uploaded.seek(0)
+            df = pd.read_csv(file_path_or_uploaded, sep=sep, encoding='utf-8')
+        else:
+            try:
+                df = pd.read_csv(file_path_or_uploaded, sep=sep, encoding='utf-8')
+            except:
+                df = pd.read_csv(file_path_or_uploaded, sep=sep, encoding='gbk')
+        return df, sep
+    except Exception as e:
+        # 最后尝试用默认方式读取
+        if hasattr(file_path_or_uploaded, 'read'):
+            if hasattr(file_path_or_uploaded, 'seek'):
+                file_path_or_uploaded.seek(0)
+            df = pd.read_csv(file_path_or_uploaded)
+        else:
+            df = pd.read_csv(file_path_or_uploaded)
+        return df, ','
 
 
 def render_file_processor_page():
@@ -22,18 +85,15 @@ def render_file_processor_page():
         .stApp {
             background-color: #f0f2f6 !important;
         }
-
+        .stMarkdownContainer{
+            color: #ffffff !important;
+        }
         /* 主容器背景 */
         .block-container {
             background-color: #f0f2f6 !important;
             max-height: none !important;
             height: auto !important;
             padding-bottom: 100px !important;
-        }
-
-        /* 标题样式 */
-        h1, h2, h3 {
-            color: #1e293b !important;
         }
 
         /* 选项卡样式 */
@@ -100,7 +160,7 @@ def render_file_processor_page():
 
         /* 扩展器样式 */
         .streamlit-expanderHeader {
-            background-color: #ffffff;
+            background-color: ##1890FF;
             border-radius: 6px;
             color: #1e293b;
         }
@@ -113,13 +173,44 @@ def render_file_processor_page():
         background-color: #f0f2f6 !important;
         padding-bottom: 100px !important;  /* 底部留出100px空间 */
         }
+        /* 2. 改上传按钮颜色 */
+        .stFileUploader button {
+            background-color: #1890FF !important;
+            color: white !important;
+            border-radius: 6px !important;
+        }
+        /* 选中 help 对应的问号图标并隐藏 */
+        .stTooltipIcon {
+            display: none !important;
+        }
+        .stFileUploaderFileName{
+            color: black;
+        }
+        .stExpander{
+            color: black !important;
+        }
+          .st-emotion-cache-11ofl8m {
+            background-color: #f0f2f6 !important;
+        }
+        .my-black-title {
+            color: #000000 !important;
+            font-size: 24px !important;
+            font-weight: 700 !important;
+            margin: 0 0 10px 0 !important;
+        }
+        .my-black-subtitle {
+            color: #000000 !important;
+            font-size: 20px !important;
+            font-weight: 600 !important;
+            margin: 0 0 10px 0 !important;
+        }
     </style>
+  
     """, unsafe_allow_html=True)
-
-    st.header("📁 文件处理")
-
+    st.markdown('<p class="my-black-title">📁 文件处理</p>', unsafe_allow_html=True)
+    #st.header("📁 文件处理")
     # 创建选项卡
-    tab1, tab2, tab3 = st.tabs(["合并文件", "数据筛选", "导出数据"])
+    tab1, tab2 = st.tabs(["合并", "筛选"])
 
     with tab1:
         merge_files_section()
@@ -127,50 +218,12 @@ def render_file_processor_page():
     with tab2:
         filter_data_section()
 
-    with tab3:
-        export_data_section()
-
-
-def upload_files_section():
-    """文件上传区域"""
-    st.subheader("📤 上传CSV文件")
-    
-    uploaded_files = st.file_uploader(
-        "选择要上传的CSV文件",
-        type=['csv'],
-        accept_multiple_files=True,
-        help="支持多文件上传"
-    )
-    
-    if uploaded_files:
-        st.success(f"✅ 已上传 {len(uploaded_files)} 个文件")
-        
-        # 显示文件信息
-        with st.expander("查看文件详情"):
-            for file in uploaded_files:
-                df = pd.read_csv(file)
-                st.write(f"**{file.name}** - {len(df)} 行, {len(df.columns)} 列")
-                st.dataframe(df.head(3))
-
-@st.cache_data
-def load_and_merge_files(file_list: List) -> pd.DataFrame:
-    """加载并合并多个CSV文件"""
-    dfs = []
-    for file in file_list:
-        df = pd.read_csv(file)
-        df['_source_file'] = file.name
-        dfs.append(df)
-    
-    if dfs:
-        return pd.concat(dfs, ignore_index=True)
-    return pd.DataFrame()
-
-
 def merge_files_section():
     """文件合并区域"""
 
     # 上传区域
-    st.markdown("### 📤 上传CSV文件")
+    st.markdown('<p class="my-black-subtitle">📤 上传CSV文件</p>', unsafe_allow_html=True)
+    #st.markdown("### 📤 上传CSV文件")
     uploaded_files = st.file_uploader(
         "",
         type=['csv'],
@@ -181,51 +234,76 @@ def merge_files_section():
 
     # 同时显示已上传的文件和本地已保存的文件
     all_available_files = []
+    upload_dir = Path("uploaded_files")
 
     # 添加刚刚上传的文件（未保存）
     if uploaded_files:
         st.success(f"✅ 已上传 {len(uploaded_files)} 个文件")
-        all_available_files.extend(uploaded_files)
 
-        # 显示文件信息
+        # 显示文件信息（添加错误处理）
         with st.expander("查看文件详情"):
             for file in uploaded_files:
-                df = pd.read_csv(file)
-                st.write(f"**{file.name}** - {len(df)} 行, {len(df.columns)} 列")
-                st.dataframe(df.head(3))
+                try:
+                    df, sep = read_csv_with_auto_separator(file)
+                    if df.empty:
+                        st.warning(f"⚠️ **{file.name}** - 文件为空")
+                    else:
+                        sep_display = 'Tab' if sep == '\t' else sep
+                        st.write(f"**{file.name}** - {len(df)} 行, {len(df.columns)} 列 (分隔符: {sep_display})")
+                        st.dataframe(df.head(3))
+                        all_available_files.append(file)
+                except Exception as e:
+                    st.error(f"❌ **{file.name}** - 读取失败: {str(e)}")
 
     # 添加本地已保存的文件
-    upload_dir = Path("uploaded_files")
     if upload_dir.exists():
         csv_files = list(upload_dir.glob("*.csv"))
         all_available_files.extend(csv_files)
 
     st.markdown("---")
-    st.subheader("🔗 合并多个CSV文件")
+
+    #st.subheader("🔗 合并多个CSV文件")
+    st.markdown('<p class="my-black-subtitle">🔗 合并多个CSV文件</p>', unsafe_allow_html=True)
 
     if all_available_files:
         selected_files = st.multiselect(
             "选择要合并的文件",
             options=[f.name for f in all_available_files],
-            default=[f.name for f in all_available_files[:3]]
+            default=[f.name for f in all_available_files[:3]] if len(all_available_files) >= 3 else None
         )
 
         if selected_files:
             if st.button("🔀 开始合并"):
                 with st.spinner("正在合并文件..."):
-                    # 根据文件类型选择加载方式
+                    # 根据文件类型选择加载方式（添加错误处理）
                     merged_dfs = []
+                    errors = []
                     for file_name in selected_files:
-                        # 检查是上传的文件还是本地文件
-                        uploaded_file = next((f for f in (uploaded_files or []) if f.name == file_name), None)
-                        if uploaded_file:
-                            df = pd.read_csv(uploaded_file)
-                            df['_source_file'] = uploaded_file.name
-                        else:
-                            file_path = upload_dir / file_name
-                            df = pd.read_csv(file_path)
-                            df['_source_file'] = file_name
-                        merged_dfs.append(df)
+                        try:
+                            # 检查是上传的文件还是本地文件
+                            uploaded_file = next((f for f in (uploaded_files or []) if f.name == file_name), None)
+                            if uploaded_file:
+                                df, sep = read_csv_with_auto_separator(uploaded_file)
+                                if not df.empty:
+                                    df['_source_file'] = uploaded_file.name
+                                    merged_dfs.append(df)
+                                else:
+                                    errors.append(f"{file_name} - 文件为空")
+                            else:
+                                file_path = upload_dir / file_name
+                                df, sep = read_csv_with_auto_separator(file_path)
+                                if not df.empty:
+                                    df['_source_file'] = file_name
+                                    merged_dfs.append(df)
+                                else:
+                                    errors.append(f"{file_name} - 文件为空")
+                        except Exception as e:
+                            errors.append(f"{file_name} - {str(e)}")
+
+                    # 显示错误信息
+                    if errors:
+                        for err in errors:
+                            st.warning(f"⚠️ {err}")
 
                     if merged_dfs:
                         merged_df = pd.concat(merged_dfs, ignore_index=True)
@@ -243,8 +321,21 @@ def merge_files_section():
                         with col3:
                             st.metric("文件数", len(selected_files))
 
-                        # 保存合并结果
-                        if st.button("💾 保存合并结果"):
+                        # 导出合并结果
+                        st.markdown("---")
+                        st.subheader("📤 导出合并结果")
+
+                        # 生成临时文件用于下载
+                        merged_csv = merged_df.to_csv(index=False)
+                        st.download_button(
+                            label="⬇️ 导出CSV",
+                            data=merged_csv,
+                            file_name=f"merged_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                            mime="text/csv"
+                        )
+
+                        # 同时保存到本地
+                        if st.button("💾 保存到本地"):
                             if not upload_dir.exists():
                                 upload_dir.mkdir(exist_ok=True)
                             output_file = upload_dir / f"merged_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
@@ -252,50 +343,6 @@ def merge_files_section():
                             st.success(f"✅ 已保存到 {output_file.name}")
     else:
         st.info("📁 请先上传CSV文件")
-    
-    # 选择要合并的文件
-    upload_dir = Path("uploaded_files")
-    if upload_dir.exists():
-        csv_files = list(upload_dir.glob("*.csv"))
-        
-        if csv_files:
-            selected_files = st.multiselect(
-                "选择要合并的文件",
-                options=[f.name for f in csv_files],
-                default=[f.name for f in csv_files[:3]]
-            )
-            
-            if selected_files:
-                selected_file_paths = [upload_dir / f for f in selected_files]
-                
-                if st.button("🔀 开始合并"):
-                    with st.spinner("正在合并文件..."):
-                        merged_df = load_and_merge_files(selected_file_paths)
-                        
-                        if not merged_df.empty:
-                            st.success(f"✅ 合并成功！共 {len(merged_df)} 行数据")
-                            
-                            # 显示合并结果
-                            st.dataframe(merged_df.head(10))
-                            
-                            # 显示统计信息
-                            col1, col2, col3 = st.columns(3)
-                            with col1:
-                                st.metric("总行数", len(merged_df))
-                            with col2:
-                                st.metric("总列数", len(merged_df.columns))
-                            with col3:
-                                st.metric("文件数", len(selected_files))
-                            
-                            # 保存合并结果
-                            if st.button("💾 保存合并结果"):
-                                output_file = upload_dir / f"merged_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-                                merged_df.to_csv(output_file, index=False)
-                                st.success(f"✅ 已保存到 {output_file.name}")
-                            else:
-                                st.error("❌ 合并失败")
-                        else:
-                            st.info("📁 上传目录中没有CSV文件，请先上传文件")
 
 def filter_data_section():
     """数据筛选区域"""
@@ -310,24 +357,28 @@ def filter_data_section():
         key="filter_upload"
     )
 
-    st.markdown("---")
-    st.subheader("🔍 数据筛选")
-
     # 获取所有可用文件（包括上传的文件和本地文件）
     all_available_files = []
+    upload_dir = Path("uploaded_files")
 
     # 添加刚刚上传的文件
     if uploaded_files:
         st.success(f"✅ 已上传 {len(uploaded_files)} 个文件")
 
-        # 显示文件信息
+        # 显示文件信息（添加错误处理）
         with st.expander("查看文件详情"):
             for file in uploaded_files:
-                df = pd.read_csv(file)
-                st.write(f"**{file.name}** - {len(df)} 行, {len(df.columns)} 列")
-                st.dataframe(df.head(3))
-
-        all_available_files.extend(uploaded_files)
+                try:
+                    df, sep = read_csv_with_auto_separator(file)
+                    if df.empty:
+                        st.warning(f"⚠️ **{file.name}** - 文件为空")
+                    else:
+                        sep_display = 'Tab' if sep == '\t' else sep
+                        st.write(f"**{file.name}** - {len(df)} 行, {len(df.columns)} 列 (分隔符: {sep_display})")
+                        st.dataframe(df.head(3))
+                        all_available_files.append(file)
+                except Exception as e:
+                    st.error(f"❌ **{file.name}** - 读取失败: {str(e)}")
 
         # 保存文件到本地
         if st.button("💾 保存文件", key="save_filter"):
@@ -342,10 +393,12 @@ def filter_data_section():
             st.success(f"✅ 文件已保存到 {save_dir.absolute()}")
 
     # 添加本地已保存的文件
-    upload_dir = Path("uploaded_files")
     if upload_dir.exists():
         csv_files = list(upload_dir.glob("*.csv"))
         all_available_files.extend(csv_files)
+
+    st.markdown("---")
+    st.subheader("🔍 数据筛选")
 
     if all_available_files:
         selected_file = st.selectbox(
@@ -355,14 +408,23 @@ def filter_data_section():
         )
 
         if selected_file:
-            # 根据文件类型选择加载方式
-            uploaded_file = next((f for f in (uploaded_files or []) if f.name == selected_file), None)
-            if uploaded_file:
-                df = pd.read_csv(uploaded_file)
-            else:
-                df = pd.read_csv(upload_dir / selected_file)
+            # 根据文件类型选择加载方式（添加错误处理）
+            try:
+                uploaded_file = next((f for f in (uploaded_files or []) if f.name == selected_file), None)
+                if uploaded_file:
+                    df, sep = read_csv_with_auto_separator(uploaded_file)
+                else:
+                    df, sep = read_csv_with_auto_separator(upload_dir / selected_file)
 
-            st.info(f"📊 加载了 {len(df)} 行数据")
+                if df.empty:
+                    st.warning("⚠️ 当前文件为空，请选择其他文件")
+                    return
+
+                sep_display = 'Tab' if sep == '\t' else sep
+                st.info(f"📊 加载了 {len(df)} 行, {len(df.columns)} 列 (分隔符: {sep_display})")
+            except Exception as e:
+                st.error(f"❌ 读取文件失败: {str(e)}")
+                return
 
             # 选择筛选列
             filter_column = st.selectbox(
@@ -404,114 +466,27 @@ def filter_data_section():
                 st.dataframe(filtered_df.head(20))
 
                 # 导出筛选结果
-                if st.button("💾 导出筛选结果"):
+                st.markdown("---")
+                st.subheader("📤 导出筛选结果")
+
+                # 下载按钮
+                filtered_csv = filtered_df.to_csv(index=False)
+                st.download_button(
+                    label="⬇️ 导出CSV",
+                    data=filtered_csv,
+                    file_name=f"filtered_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                    mime="text/csv"
+                )
+
+                # 保存到本地
+                if st.button("💾 保存到本地"):
+                    if not upload_dir.exists():
+                        upload_dir.mkdir(exist_ok=True)
                     output_file = upload_dir / f"filtered_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
                     filtered_df.to_csv(output_file, index=False)
-                    st.success(f"✅ 已导出到 {output_file.name}")
+                    st.success(f"✅ 已保存到 {output_file.name}")
     else:
         st.info("📁 请先上传CSV文件")
 
 
-def export_data_section():
-    """数据导出区域"""
 
-    # 上传区域
-    st.markdown("### 📤 上传CSV文件")
-    uploaded_files = st.file_uploader(
-        "",
-        type=['csv'],
-        accept_multiple_files=True,
-        help="支持多文件上传",
-        key="export_upload"
-    )
-
-    if uploaded_files:
-        st.success(f"✅ 已上传 {len(uploaded_files)} 个文件")
-
-        # 显示文件信息
-        with st.expander("查看文件详情"):
-            for file in uploaded_files:
-                df = pd.read_csv(file)
-                st.write(f"**{file.name}** - {len(df)} 行, {len(df.columns)} 列")
-                st.dataframe(df.head(3))
-
-        # 保存文件到本地
-        if st.button("💾 保存文件", key="save_export"):
-            save_dir = Path("uploaded_files")
-            save_dir.mkdir(exist_ok=True)
-
-            for file in uploaded_files:
-                file_path = save_dir / file.name
-                with open(file_path, 'wb') as f:
-                    f.write(file.getbuffer())
-
-            st.success(f"✅ 文件已保存到 {save_dir.absolute()}")
-
-    st.markdown("---")
-    st.subheader("📤 导出数据")
-    
-    upload_dir = Path("uploaded_files")
-    if not upload_dir.exists():
-        upload_dir.mkdir(exist_ok=True)
-    
-    # 列出所有文件
-    all_files = []
-    if upload_dir.exists():
-        all_files = list(upload_dir.glob("*.csv"))
-    
-    if all_files:
-        # 显示文件列表
-        st.write(f"📁 共有 {len(all_files)} 个文件")
-        
-        # 选择要导出的文件
-        export_file = st.selectbox(
-            "选择要导出的文件",
-            options=[f.name for f in sorted(all_files, key=lambda x: x.stat().st_mtime, reverse=True)],
-            index=0
-        )
-        
-        if export_file:
-            file_path = upload_dir / export_file
-            
-            # 显示文件信息
-            df = pd.read_csv(file_path)
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("行数", len(df))
-            with col2:
-                st.metric("列数", len(df.columns))
-            with col3:
-                file_size = file_path.stat().st_size / 1024
-                st.metric("文件大小", f"{file_size:.2f} KB")
-            
-            # 下载按钮
-            with open(file_path, 'rb') as f:
-                st.download_button(
-                    label="⬇️ 下载文件",
-                    data=f,
-                    file_name=export_file,
-                    mime="text/csv"
-                )
-            
-            # 预览数据
-            with st.expander("👀 预览数据"):
-                st.dataframe(df.head(10))
-            
-            # 打包下载选项
-            if st.button("📦 打包下载所有文件"):
-                zip_filename = upload_dir / f"all_files_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
-                with zipfile.ZipFile(zip_filename, 'w') as zipf:
-                    for file in all_files:
-                        zipf.write(file, file.name)
-                
-                with open(zip_filename, 'rb') as f:
-                    st.download_button(
-                        label="⬇️ 下载压缩包",
-                        data=f,
-                        file_name=zip_filename.name,
-                        mime="application/zip"
-                    )
-                
-                st.success(f"✅ 已打包 {len(all_files)} 个文件")
-    else:
-        st.info("📁 没有可导出的文件，请先上传文件")

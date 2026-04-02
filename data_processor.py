@@ -4,7 +4,7 @@ from typing import List, Dict, Optional
 from datetime import datetime
 
 class DataProcessor:
-    """数据处理类：读取、合并、差分、筛选"""
+    """数据处理类：合并、拆分"""
 
     def __init__(self, data_path: str):
         """
