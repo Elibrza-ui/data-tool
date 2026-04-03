@@ -204,6 +204,35 @@ def render_file_processor_page():
             font-weight: 600 !important;
             margin: 0 0 10px 0 !important;
         }
+            /* 给所有 metric 标签设置黑色字体 */
+        [data-testid="stMetricLabel"] {
+            color: black !important;
+            font-size: 16px;
+        }
+        /* 给 metric 数值也设置黑色字体（可选） */
+        [data-testid="stMetricValue"] {
+            color: black !important;
+            font-size: 20px;
+        }
+        /* 多选框标签 = 黑色 */  选择要合并的文件
+        .multiselect label {
+            color: black !important;
+            font-weight: 500; /* 可选：稍微加粗，更好看 */
+        }
+        .stMultiSelect label {
+            color: black !important;
+        }
+        .stRadio label {
+            color: black !important;
+        }
+         div:has(> div[data-testid="stRadio"]) [key="merge_order_radio"] div[data-testid="stMarkdownContainer"] p {{
+            color: black !important;
+        }}
+        /* 选中圆圈绿色 */
+        div:has(> div[data-testid="stRadio"]) [key="merge_order_radio"] div[role="radio"]:checked {{
+            background-color: #00c851 !important;
+            border-color: #00c851 !important;
+        }}
     </style>
   
     """, unsafe_allow_html=True)
@@ -249,18 +278,18 @@ def merge_files_section():
                         st.warning(f"⚠️ **{file.name}** - 文件为空")
                     else:
                         sep_display = 'Tab' if sep == '\t' else sep
-                        st.write(f"**{file.name}** - {len(df)} 行, {len(df.columns)} 列 (分隔符: {sep_display})")
-                        st.dataframe(df.head(3))
+                        st.write(f"**{file.name}** - {len(df)} 行, {len(df.columns)} 列 ")
+                        st.dataframe(df,use_container_width=True)
                         all_available_files.append(file)
                 except Exception as e:
                     st.error(f"❌ **{file.name}** - 读取失败: {str(e)}")
 
     # 添加本地已保存的文件
-    if upload_dir.exists():
-        csv_files = list(upload_dir.glob("*.csv"))
-        all_available_files.extend(csv_files)
+    #if upload_dir.exists():
+        #csv_files = list(upload_dir.glob("*.csv"))
+        #all_available_files.extend(csv_files)
 
-    st.markdown("---")
+    #st.markdown("---")
 
     #st.subheader("🔗 合并多个CSV文件")
     st.markdown('<p class="my-black-subtitle">🔗 合并多个CSV文件</p>', unsafe_allow_html=True)
@@ -269,8 +298,30 @@ def merge_files_section():
         selected_files = st.multiselect(
             "选择要合并的文件",
             options=[f.name for f in all_available_files],
-            default=[f.name for f in all_available_files[:3]] if len(all_available_files) >= 3 else None
+            default=None
         )
+        if selected_files:
+            # 获取第一个文件的表头（用来给用户选择排序列）
+            try:
+                first_file = next((f for f in all_available_files if f.name == selected_files[0]))
+                temp_df, _ = read_csv_with_auto_separator(first_file)
+                sort_columns = temp_df.columns.tolist()
+            except:
+                sort_columns = []
+
+            # 选择合并规则
+            merge_order = st.radio(
+                "选择要合并的顺序",
+                options=["按文件顺序合并", "按表格列名排序合并"],
+                horizontal=True  # 横向排版，更好看
+            )
+
+            # 如果选择按列排序 → 显示列选择
+            sort_by = None
+            if merge_order == "按表格列名排序合并" and sort_columns:
+                st.markdown('<span style="color:black; font-weight:500px">请选择排序依据列</span>',
+                            unsafe_allow_html=True)
+                sort_by = st.selectbox("", options=sort_columns,label_visibility = "collapsed")
 
         if selected_files:
             if st.button("🔀 开始合并"):
@@ -307,10 +358,15 @@ def merge_files_section():
 
                     if merged_dfs:
                         merged_df = pd.concat(merged_dfs, ignore_index=True)
+                        # ======================
+                        # 自动按选择的顺序排序
+                        # ======================
+                        if merge_order == "按表格列名排序合并" and sort_by is not None and sort_by in merged_df.columns:
+                            merged_df = merged_df.sort_values(by=sort_by, ascending=True).reset_index(drop=True)
                         st.success(f"✅ 合并成功！共 {len(merged_df)} 行数据")
 
                         # 显示合并结果
-                        st.dataframe(merged_df.head(10))
+                        st.dataframe(merged_df,use_container_width=True)
 
                         # 显示统计信息
                         col1, col2, col3 = st.columns(3)
@@ -348,7 +404,8 @@ def filter_data_section():
     """数据筛选区域"""
 
     # 上传区域
-    st.markdown("### 📤 上传CSV文件")
+    st.markdown('<p class="my-black-subtitle">📤 上传CSV文件</p>', unsafe_allow_html=True)
+    #st.markdown("### 📤 上传CSV文件")
     uploaded_files = st.file_uploader(
         "",
         type=['csv'],
